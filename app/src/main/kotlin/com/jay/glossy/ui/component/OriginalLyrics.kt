@@ -660,7 +660,7 @@ fun OriginalLyrics(
     }
 
     val latestShowLyrics by rememberUpdatedState(showLyrics)
-    val latestResyncLyrics by rememberUpdatedState(
+    val latestResyncLyrics by rememberUpdatedState<() -> Unit>(
         newValue = {
             isAutoScrollEnabled = true
             lastPreviewTime = 0L
