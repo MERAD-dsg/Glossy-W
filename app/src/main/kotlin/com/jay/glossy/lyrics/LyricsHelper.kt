@@ -452,31 +452,11 @@ constructor(
                     .mapNotNull { LyricsProviderRegistry.getProviderByName(it) }
             }
 
-        // A provider added after the stored order was written — "Spotify" is
-        // the case that motivated this — would otherwise never take part in
-        // the race at all: an old order string cannot mention it, and the
-        // priority screen cannot show what the resolver drops. They join at
-        // the bottom, where the user can see them and move them up.
         val missing = LyricsProviderRegistry.getDefaultProviderOrder()
             .mapNotNull { LyricsProviderRegistry.getProviderByName(it) }
             .filter { known -> configured.none { it.name == known.name } }
 
-        val order = configured + missing
-
-        // A signed-in Spotify account settles the top of the race by itself.
-        // Spotify's own lyrics are the text every other provider here is
-        // scraping a copy of, they arrive with real timestamps to animate
-        // against, and the app is already holding the cookie that fetches them —
-        // so they go first. The order the listener arranged is not rewritten:
-        // this decides who leads today, and stops deciding the moment the
-        // session is gone.
-        val signedInToSpotify =
-            preferences[SpotifySession.CookieKey].orEmpty().isNotBlank()
-        if (!signedInToSpotify) return order
-
-        val spotify =
-            order.filter { provider -> provider.name == SpotifyLyricsProvider.name }
-        return spotify + order.filterNot { provider -> provider.name == SpotifyLyricsProvider.name }
+        return configured + missing
     }
 
     companion object {

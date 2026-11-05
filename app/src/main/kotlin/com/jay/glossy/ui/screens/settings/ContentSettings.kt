@@ -188,16 +188,17 @@ fun ContentSettings(
         }
     }
 
+    val betterLyricsUnisonLabel = stringResource(R.string.better_lyrics_unison)
     val providerDisplayNames =
         mapOf(
-                "Spotify" to "Spotify",
-                "BetterLyrics" to "Better Lyrics",
+            "Unison" to betterLyricsUnisonLabel,
+            "Spotify" to "Spotify",
+            "BetterLyrics" to "Better Lyrics",
             "Paxsenix" to "Paxsenix",
             "LrcLib" to "LrcLib",
             "KuGou" to "KuGou",
             "LyricsPlus" to "LyricsPlus",
             "YouLyPlus" to "YouLyPlus",
-            "Unison" to "Unison",
             "BiniLyrics" to "Bini Lyrics",
             "SimpMusic" to "SimpMusic",
             "NetEase" to "NetEase Music",
@@ -528,9 +529,9 @@ fun ContentSettings(
                         Column(
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Enable Unison")
+                            Text(stringResource(R.string.enable_better_lyrics_unison))
                             Text(
-                                text = "Community-driven lyrics from unison.boidu.dev",
+                                text = stringResource(R.string.enable_better_lyrics_unison_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

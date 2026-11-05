@@ -660,6 +660,7 @@ val QuickPicksKey = stringPreferencesKey("discover")
 val PreferredLyricsProviderKey = stringPreferencesKey("lyricsProvider")
 val LyricsProviderOrderKey = stringPreferencesKey("lyricsProviderOrder")
 val SimpMusicMigrationDoneKey = booleanPreferencesKey("simpMusicMigrationDone")
+val UnisonPriorityMigrationDoneKey = booleanPreferencesKey("unisonPriorityMigrationDone")
 val QueueEditLockKey = booleanPreferencesKey("queueEditLock")
 val ShowWrappedCardKey = booleanPreferencesKey("show_wrapped_card")
 val WrappedSeenKey = booleanPreferencesKey("wrapped_seen")
@@ -817,13 +818,13 @@ enum class QuickPicks {
 }
 
 enum class PreferredLyricsProvider {
+    UNISON,
+    BETTER_LYRICS,
     LRCLIB,
     KUGOU,
-    BETTER_LYRICS,
     PAXSENIX,
     LYRICSPLUS,
     YOULYPLUS,
-    UNISON,
     BINILYRICS,
     SIMPMUSIC,
     NETEASE,

@@ -127,4 +127,9 @@
     <string name="sponsor_block_category_filler">Filler</string>
     <string name="sponsor_block_category_interaction">Interaction reminders</string>
     <string name="sponsor_block_category_hook">Hooks</string>
+    <!-- Better Lyrics Unison — provider toggle, display name and attribution -->
+    <string name="better_lyrics_unison">Better Lyrics Unison</string>
+    <string name="enable_better_lyrics_unison">Enable Better Lyrics Unison</string>
+    <string name="enable_better_lyrics_unison_desc">Word-by-word and line-synced lyrics from unison.boidu.dev</string>
+    <string name="lyrics_from_unison">Lyrics from Unison (https://unison.boidu.dev)</string>
 </resources>

@@ -5,22 +5,21 @@
 
 package com.jay.glossy.lyrics
 
-import com.jay.glossy.R
 import java.util.Locale
 
 object LyricsProviderRegistry {
-    private val providerMap = mapOf(
-        "Spotify" to SpotifyLyricsProvider,
+    private val providerMap = linkedMapOf(
+        "Unison" to UnisonLyricsProvider,
         "BetterLyrics" to BetterLyricsProvider,
+        "Spotify" to SpotifyLyricsProvider,
+        "YouLyPlus" to YouLyPlusLyricsProvider,
         "Paxsenix" to PaxsenixLyricsProvider,
+        "LyricsPlus" to LyricsPlusProvider,
         "LrcLib" to LrcLibLyricsProvider,
         "KuGou" to KuGouLyricsProvider,
-        "LyricsPlus" to LyricsPlusProvider,
-        "YouLyPlus" to YouLyPlusLyricsProvider,
-        "Unison" to UnisonLyricsProvider,
+        "NetEase" to NetEaseLyricsProvider,
         "BiniLyrics" to BiniLyricsProvider,
         "SimpMusic" to SimpMusicLyricsProvider,
-        "NetEase" to NetEaseLyricsProvider,
         "Megalobiz" to MegalobizLyricsProvider,
         "YouTubeSubtitle" to YouTubeSubtitleLyricsProvider,
         "YouTube" to YouTubeLyricsProvider,
@@ -38,49 +37,44 @@ object LyricsProviderRegistry {
             return getDefaultProviderOrder()
         }
         // Two separators have shipped: the priority screen serialises with ","
-        // while an older migration wrote ";". Splitting on only the comma made
-        // a semicolon-joined order parse to a single unknown token, which was
-        // filtered away — so the whole list came back empty and the resolver
-        // silently fell back to the default order, ignoring whatever the user
-        // had arranged. Accept both, and match names case-insensitively so a
-        // hand-edited or older entry still lands on its provider.
+        // while an older migration wrote ";". Accept both, match names
+        // case-insensitively, and append any newly added providers at the end
+        // so they remain visible in the priority screen and eligible in races.
         val byLowercaseName = providerNames.associateBy { it.lowercase(Locale.ROOT) }
-        return orderString
+        val configured = orderString
             .split(';', ',')
             .map { it.trim() }
             .mapNotNull { stored -> byLowercaseName[stored.lowercase(Locale.ROOT)] }
+            .distinct()
+
+        if (configured.isEmpty()) {
+            return getDefaultProviderOrder()
+        }
+
+        val missing = getDefaultProviderOrder().filter { it !in configured }
+        return configured + missing
     }
 
     fun serializeProviderOrder(providers: List<String>): String {
-        // The comma is the canonical separator: every writer must agree on it,
-        // or deserialization has to guess which format it is reading.
-        return providers.filter { it in providerNames }.joinToString(",")
+        return providers.filter { it in providerNames }.distinct().joinToString(",")
     }
 
     /**
-     * The order a fresh install races in.
-     *
-     * Spotify leads. It is the one provider here whose lyrics come from the
-     * listener's own account instead of a third-party index, it answers with
-     * real timestamps for the lyric view to animate against, and it is the only
-     * one the app is already signed in to. A provider that has nothing to say is
-     * skipped in moments, so leading costs the race nothing when no Spotify
-     * account is signed in — and when one is, these are the lyrics it can
-     * already provide.
+     * Default lyrics provider priority order: Better Lyrics Unison leads by default.
      */
     fun getDefaultProviderOrder(): List<String> = listOf(
-        "Spotify",
-        "NetEase",
-        "YouLyPlus",
         "Unison",
-        "BiniLyrics",
-        "SimpMusic",
         "BetterLyrics",
+        "Spotify",
+        "YouLyPlus",
+        "Paxsenix",
+        "LyricsPlus",
         "LrcLib",
         "KuGou",
-        "Paxsenix",
+        "NetEase",
+        "BiniLyrics",
+        "SimpMusic",
         "Megalobiz",
-        "LyricsPlus",
         "YouTubeSubtitle",
         "YouTube",
     )

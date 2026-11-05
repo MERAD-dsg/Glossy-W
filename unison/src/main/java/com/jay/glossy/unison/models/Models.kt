@@ -8,6 +8,7 @@ data class LyricsData(
     val id: Long,
     @SerialName("videoId")
     val videoId: String? = null,
+    val isrc: String? = null,
     val song: String? = null,
     val artist: String? = null,
     val album: String? = null,
@@ -23,6 +24,8 @@ data class LyricsData(
     val voteCount: Int? = null,
     val confidence: String? = null,
     val duration: Double? = null,
+    @SerialName("matchScore")
+    val matchScore: Double? = null,
 )
 
 @Serializable
