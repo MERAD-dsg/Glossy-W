@@ -30,6 +30,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -234,6 +235,7 @@ fun OriginalLyrics(
 
     val scope = rememberCoroutineScope()
 
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
     val lyricsEntity by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue = null)
     val currentSong by playerConnection.currentSong.collectAsStateWithLifecycle(initialValue = null)
@@ -251,132 +253,75 @@ fun OriginalLyrics(
             if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
         }
 
-    val decodedList =
-        if (romanizeLyricsList.value.isEmpty()) {
-            defaultList
-        } else {
-            romanizeLyricsList.value.split(",").map { entry ->
-                val (lang, checked) = entry.split(":")
-                Pair(lang, checked.toBoolean())
-            }
+    val enabledLanguages =
+        remember(romanizeLyricsList.value) {
+            val decodedList =
+                if (romanizeLyricsList.value.isEmpty()) {
+                    defaultList
+                } else {
+                    romanizeLyricsList.value.split(",").mapNotNull { entry ->
+                        val parts = entry.split(":")
+                        if (parts.size == 2) Pair(parts[0], parts[1].toBoolean()) else null
+                    }
+                }
+            decodedList.filter { (_, checked) -> checked }.map { (lang, _) -> lang }
         }
 
-    val enabledLanguages = decodedList.filter { (_, checked) -> checked }.map { (lang, _) -> lang }
-
-    // The parser is the only authority on whether these lyrics are timed, and it
-    // is asked exactly once. Three places used to answer that question — this
-    // list, `isSynced`, and the ticker below — and two of them asked a different
-    // one: `lyrics.startsWith("[")`. A payload whose timestamps did not begin on
-    // its very first line (a title, an attribution, anything the provider placed
-    // above the first stamp — which is how the YouTube Music shelf arrives) was
-    // therefore announced to the player as time-synced, built with fake 100 ms
-    // spacing, and then handed to a ticker that refused to start. The lines sat
-    // still for the whole song, and no amount of scrolling preference changed
-    // that. Reading one parse three ways makes the disagreement impossible.
     val parsedEntries =
         remember(lyrics) {
             if (lyrics == null || lyrics == LYRICS_NOT_FOUND) emptyList() else parseLyrics(lyrics)
         }
 
+    val songHasWordTimings =
+        remember(parsedEntries) {
+            parsedEntries.any { !it.words.isNullOrEmpty() }
+        }
+
     val lines =
-        remember(parsedEntries, lyrics, scope) {
+        remember(parsedEntries, lyrics) {
             if (lyrics == null || lyrics == LYRICS_NOT_FOUND) {
                 emptyList()
             } else if (parsedEntries.isNotEmpty()) {
-                val parsedLines = parsedEntries
-
-                parsedLines
-                    .map { entry ->
-                        val newEntry =
-                            LyricsEntry(entry.time, entry.text, entry.words, agent = entry.agent, isBackground = entry.isBackground)
-
-                        scope.launch {
-                            val text = if (romanizeCyrillicByLine) entry.text else lyrics
-                            var value: String? = ""
-
-                            when {
-                                "Japanese" in enabledLanguages && isJapanese(text) && !isChinese(text) -> {
-                                    value =
-                                        romanizeJapanese(entry.text)
-                                }
-
-                                "Korean" in enabledLanguages && isKorean(text) -> {
-                                    value = romanizeKorean(entry.text)
-                                }
-
-                                "Chinese" in enabledLanguages && isChinese(text) -> {
-                                    value = romanizeChinese(entry.text)
-                                }
-
-                                "Hindi" in enabledLanguages && isHindi(text) -> {
-                                    value = romanizeHindi(entry.text)
-                                }
-
-                                "Ukrainian" in enabledLanguages && isUkrainian(text) -> {
-                                    value = romanizeCyrillic(entry.text)
-                                }
-
-                                "Russian" in enabledLanguages && isRussian(text) -> {
-                                    value = romanizeCyrillic(entry.text)
-                                }
-
-                                "Serbian" in enabledLanguages && isSerbian(text) -> {
-                                    value = romanizeCyrillic(entry.text)
-                                }
-
-                                "Bulgarian" in enabledLanguages && isBulgarian(text) -> {
-                                    value = romanizeCyrillic(entry.text)
-                                }
-
-                                "Belarusian" in enabledLanguages && isBelarusian(text) -> {
-                                    value = romanizeCyrillic(entry.text)
-                                }
-
-                                "Kyrgyz" in enabledLanguages && isKyrgyz(text) -> {
-                                    value = romanizeCyrillic(entry.text)
-                                }
-
-                                "Macedonian" in enabledLanguages && isMacedonian(text) -> {
-                                    value = romanizeCyrillic(entry.text)
-                                }
-                            }
-
-                            newEntry.romanizedTextFlow.value = value
-                        }
-
-                        newEntry
-                    }.let {
-                        listOf(LyricsEntry.HEAD_LYRICS_ENTRY) + it
+                listOf(LyricsEntry.HEAD_LYRICS_ENTRY) +
+                    parsedEntries.map { entry ->
+                        LyricsEntry(entry.time, entry.text, entry.words, agent = entry.agent, isBackground = entry.isBackground)
                     }
             } else {
                 lyrics.lines().mapIndexed { index, line ->
-                    val newEntry = LyricsEntry(index * 100L, line)
-
-                    scope.launch {
-                        val text = if (romanizeCyrillicByLine) line else lyrics
-                        var value = newEntry.romanizedTextFlow.value
-
-                        when {
-                            "Japanese" in enabledLanguages && isJapanese(text) && !isChinese(text) -> value = romanizeJapanese(line)
-                            "Korean" in enabledLanguages && isKorean(text) -> value = romanizeKorean(line)
-                            "Chinese" in enabledLanguages && isChinese(text) -> value = romanizeChinese(line)
-                            "Hindi" in enabledLanguages && isHindi(text) -> value = romanizeHindi(line)
-                            "Ukrainian" in enabledLanguages && isUkrainian(text) -> value = romanizeCyrillic(line)
-                            "Russian" in enabledLanguages && isRussian(text) -> value = romanizeCyrillic(line)
-                            "Serbian" in enabledLanguages && isSerbian(text) -> value = romanizeCyrillic(line)
-                            "Bulgarian" in enabledLanguages && isBulgarian(text) -> value = romanizeCyrillic(line)
-                            "Belarusian" in enabledLanguages && isBelarusian(text) -> value = romanizeCyrillic(line)
-                            "Kyrgyz" in enabledLanguages && isKyrgyz(text) -> value = romanizeCyrillic(line)
-                            "Macedonian" in enabledLanguages && isMacedonian(text) -> value = romanizeCyrillic(line)
-                        }
-
-                        newEntry.romanizedTextFlow.value = value
-                    }
-
-                    newEntry
+                    LyricsEntry(index * 100L, line)
                 }
             }
         }
+
+    LaunchedEffect(lines, lyrics, enabledLanguages, romanizeCyrillicByLine) {
+        if (lyrics == null || lyrics == LYRICS_NOT_FOUND || lines.isEmpty()) return@LaunchedEffect
+        if (enabledLanguages.isEmpty()) {
+            lines.forEach { it.romanizedTextFlow.value = null }
+            return@LaunchedEffect
+        }
+        withContext(Dispatchers.Default) {
+            for (entry in lines) {
+                if (!isActive) break
+                if (entry == LyricsEntry.HEAD_LYRICS_ENTRY || entry.text.isBlank()) continue
+                val textToDetect = if (romanizeCyrillicByLine) entry.text else lyrics
+                val romanized = when {
+                    "Japanese" in enabledLanguages && isJapanese(textToDetect) && !isChinese(textToDetect) -> romanizeJapanese(entry.text)
+                    "Korean" in enabledLanguages && isKorean(textToDetect) -> romanizeKorean(entry.text)
+                    "Chinese" in enabledLanguages && isChinese(textToDetect) -> romanizeChinese(entry.text)
+                    "Hindi" in enabledLanguages && isHindi(textToDetect) -> romanizeHindi(entry.text)
+                    "Ukrainian" in enabledLanguages && isUkrainian(textToDetect) -> romanizeCyrillic(entry.text)
+                    "Russian" in enabledLanguages && isRussian(textToDetect) -> romanizeCyrillic(entry.text)
+                    "Serbian" in enabledLanguages && isSerbian(textToDetect) -> romanizeCyrillic(entry.text)
+                    "Bulgarian" in enabledLanguages && isBulgarian(textToDetect) -> romanizeCyrillic(entry.text)
+                    "Belarusian" in enabledLanguages && isBelarusian(textToDetect) -> romanizeCyrillic(entry.text)
+                    "Kyrgyz" in enabledLanguages && isKyrgyz(textToDetect) -> romanizeCyrillic(entry.text)
+                    "Macedonian" in enabledLanguages && isMacedonian(textToDetect) -> romanizeCyrillic(entry.text)
+                    else -> null
+                }
+                entry.romanizedTextFlow.value = romanized
+            }
+        }
+    }
     // The same parse `lines` was built from, so the "time-synced" announcement
     // can never contradict the list the player is actually reading.
     val isSynced = parsedEntries.isNotEmpty()
@@ -455,34 +400,49 @@ fun OriginalLyrics(
             }
         }
 
-    var currentLineIndex by remember {
-        mutableIntStateOf(-1)
+    val castHandler = remember(playerConnection) {
+        runCatching { playerConnection.service.castConnectionHandler }.getOrNull()
     }
-    var currentPlaybackPosition by remember {
-        mutableLongStateOf(0L)
+    val initialLyricsOffset = currentSong?.song?.lyricsClockOffset ?: 0
+    var currentLineIndex by remember(mediaMetadata?.id, lyrics) {
+        val livePos =
+            if (castHandler?.isCasting?.value == true) {
+                castHandler.castPosition.value
+            } else {
+                runCatching { playerConnection.player.currentPosition }.getOrDefault(0L)
+            }
+        val initPos = sliderPositionProvider() ?: livePos
+        mutableIntStateOf(
+            if (parsedEntries.isEmpty()) -1 else findCurrentLineIndex(lines, initPos + initialLyricsOffset),
+        )
+    }
+    // Kept as a State object rather than a delegated Long so only active word-synced
+    // lines subscribe to 60fps position ticks, preventing full-list recompositions.
+    val currentPlaybackPositionState = remember {
+        mutableLongStateOf(runCatching { playerConnection.player.currentPosition }.getOrDefault(0L))
     }
     // Because LaunchedEffect has delay, which leads to inconsistent with current line color and scroll animation,
     // we use deferredCurrentLineIndex when user is scrolling
-    var deferredCurrentLineIndex by rememberSaveable {
-        mutableIntStateOf(0)
+    var deferredCurrentLineIndex by remember(mediaMetadata?.id, lyrics) {
+        mutableIntStateOf(currentLineIndex.coerceAtLeast(0))
     }
 
-    var previousLineIndex by rememberSaveable {
-        mutableIntStateOf(0)
+    var previousLineIndex by remember(mediaMetadata?.id, lyrics) {
+        mutableIntStateOf(currentLineIndex)
     }
 
-    var lastPreviewTime by rememberSaveable {
+    var lastPreviewTime by remember {
         mutableLongStateOf(0L)
     }
     var isSeeking by remember {
         mutableStateOf(false)
     }
 
-    var initialScrollDone by rememberSaveable {
+    var initialScrollDone by remember(mediaMetadata?.id, lyrics) {
         mutableStateOf(false)
     }
 
-    var shouldScrollToFirstLine by rememberSaveable {
+    var shouldScrollToFirstLine by remember(mediaMetadata?.id, lyrics) {
         mutableStateOf(true)
     }
 
@@ -576,25 +536,46 @@ fun OriginalLyrics(
         selectedIndices.clear()
     }
 
-    LaunchedEffect(lyrics, parsedEntries) {
-        // Gated on the parse rather than on the first character. This used to
-        // refuse to start for any payload that did not literally open with '[',
-        // which left `currentLineIndex` pinned at -1 forever: nothing was ever
-        // highlighted as the active line, and the auto-scroll below — which
-        // keys off that index — had nothing to follow. That is the whole of
-        // "the lyrics show but never move".
+    LaunchedEffect(lyrics, parsedEntries, isPlaying, isAppMinimized, songHasWordTimings) {
         if (parsedEntries.isEmpty()) {
             currentLineIndex = -1
             return@LaunchedEffect
         }
-        while (isActive) {
-            delay(8) // Faster update for word-by-word animation
-            val sliderPosition = sliderPositionProvider()
-            isSeeking = sliderPosition != null
-            val position = sliderPosition ?: playerConnection.player.currentPosition
-            currentPlaybackPosition = position
+
+        fun syncPositionOnce(): Boolean {
+            val sliderPos = sliderPositionProvider()
+            val seekingNow = sliderPos != null
+            isSeeking = seekingNow
+            val livePos =
+                if (castHandler?.isCasting?.value == true) {
+                    castHandler.castPosition.value
+                } else {
+                    runCatching { playerConnection.player.currentPosition }.getOrDefault(0L)
+                }
+            val pos = sliderPos ?: livePos
+            if (songHasWordTimings || seekingNow) {
+                currentPlaybackPositionState.longValue = pos
+            }
             val lyricsOffset = currentSong?.song?.lyricsClockOffset ?: 0
-            currentLineIndex = findCurrentLineIndex(lines, position + lyricsOffset)
+            val newIndex = findCurrentLineIndex(lines, pos + lyricsOffset)
+            if (currentLineIndex != newIndex) {
+                currentLineIndex = newIndex
+            }
+            return seekingNow
+        }
+
+        syncPositionOnce()
+        if (isAppMinimized) return@LaunchedEffect
+
+        while (isActive) {
+            val seekingNow = syncPositionOnce()
+            val tickMs = when {
+                seekingNow -> 16L
+                !isPlaying -> 200L
+                songHasWordTimings -> 16L
+                else -> 50L
+            }
+            delay(tickMs)
         }
     }
 
@@ -621,6 +602,30 @@ fun OriginalLyrics(
     }
 
     /**
+     * Immediately positions [targetIndex] at the active center anchor without
+     * triggering multi-frame animations or nested-scroll feedback loops on remount.
+     */
+    suspend fun centerItemImmediately(targetIndex: Int) {
+        val listTargetIndex = resolveListScrollIndex(targetIndex) ?: return
+        val existingInfo = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == listTargetIndex }
+        if (existingInfo == null) {
+            lazyListState.scrollToItem(listTargetIndex)
+        }
+        val settledInfo = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == listTargetIndex }
+        if (settledInfo != null) {
+            val viewportHeight = lazyListState.layoutInfo.viewportEndOffset - lazyListState.layoutInfo.viewportStartOffset
+            if (viewportHeight > 0) {
+                val center = lazyListState.layoutInfo.viewportStartOffset + (viewportHeight * 58 / 100)
+                val itemCenter = settledInfo.offset + settledInfo.size / 2
+                val offset = (itemCenter - center).toFloat()
+                if (kotlin.math.abs(offset) > 2f) {
+                    lazyListState.scrollBy(offset)
+                }
+            }
+        }
+    }
+
+    /**
      * Smoothly scrolls the lyrics list to center the item at [targetIndex].
      *
      * @param targetIndex The index of the lyrics line to scroll to.
@@ -630,17 +635,13 @@ fun OriginalLyrics(
         targetIndex: Int,
         duration: Int = 1500,
     ) {
-        if (isAnimating) return // Prevent multiple animations
         val listTargetIndex = resolveListScrollIndex(targetIndex) ?: return
 
         isAnimating = true
         try {
             val itemInfo = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == listTargetIndex }
             if (itemInfo != null) {
-                // Item is visible, animate directly to center without sudden jumps
                 val viewportHeight = lazyListState.layoutInfo.viewportEndOffset - lazyListState.layoutInfo.viewportStartOffset
-                // Keep the active lyric slightly below the geometric center so it
-                // doesn't appear too high on screen above the player controls.
                 val center = lazyListState.layoutInfo.viewportStartOffset + (viewportHeight * 58 / 100)
                 val itemCenter = itemInfo.offset + itemInfo.size / 2
                 val offset = itemCenter - center
@@ -651,8 +652,7 @@ fun OriginalLyrics(
                     )
                 }
             } else {
-                // Item is not visible, scroll to it first without animation, then it will be handled in next cycle
-                lazyListState.scrollToItem(listTargetIndex)
+                centerItemImmediately(targetIndex)
             }
         } finally {
             isAnimating = false
@@ -662,10 +662,11 @@ fun OriginalLyrics(
     val latestShowLyrics by rememberUpdatedState(showLyrics)
     val latestResyncLyrics by rememberUpdatedState(
         newValue = {
-            scope.launch {
-                performSmoothPageScroll(currentLineIndex, 1500)
-            }
             isAutoScrollEnabled = true
+            lastPreviewTime = 0L
+            scope.launch {
+                performSmoothPageScroll(currentLineIndex.coerceAtLeast(0), 900)
+            }
         },
     )
 
@@ -677,29 +678,36 @@ fun OriginalLyrics(
         }
     }
 
-    LaunchedEffect(currentLineIndex, lastPreviewTime, initialScrollDone, isAutoScrollEnabled) {
-        if (!isSynced) return@LaunchedEffect
+    val isPreviewing = lastPreviewTime != 0L
+
+    LaunchedEffect(mediaMetadata?.id, lines.size, currentLineIndex, isPreviewing, initialScrollDone, isAutoScrollEnabled) {
+        if (!isSynced || lines.isEmpty()) return@LaunchedEffect
         if (isAutoScrollEnabled) {
-            if ((currentLineIndex == 0 && shouldScrollToFirstLine) || !initialScrollDone) {
+            if (!initialScrollDone) {
                 shouldScrollToFirstLine = false
-                // Initial scroll to center the first line with medium animation (600ms)
                 val initialCenterIndex = kotlin.math.max(0, currentLineIndex)
-                performSmoothPageScroll(initialCenterIndex, 800) // Initial scroll duration
+                // Wait one layout pass if LazyColumn hasn't measured its viewport yet
+                if (lazyListState.layoutInfo.viewportEndOffset <= lazyListState.layoutInfo.viewportStartOffset) {
+                    kotlinx.coroutines.yield()
+                }
+                centerItemImmediately(initialCenterIndex)
+                deferredCurrentLineIndex = initialCenterIndex
+                previousLineIndex = currentLineIndex
                 if (!isAppMinimized) {
                     initialScrollDone = true
                 }
+                return@LaunchedEffect
+            } else if (currentLineIndex == 0 && shouldScrollToFirstLine) {
+                shouldScrollToFirstLine = false
+                performSmoothPageScroll(0, 800)
             } else if (currentLineIndex != -1) {
                 deferredCurrentLineIndex = currentLineIndex
                 if (isSeeking) {
-                    // Fast scroll for seeking to center the target line (300ms)
                     val seekCenterIndex = kotlin.math.max(0, currentLineIndex)
-                    performSmoothPageScroll(seekCenterIndex, 500) // Fast seek duration
-                } else if ((lastPreviewTime == 0L || currentLineIndex != previousLineIndex) && scrollLyrics) {
-                    // Auto-scroll when lyrics settings allow it
+                    performSmoothPageScroll(seekCenterIndex, 400)
+                } else if ((!isPreviewing || currentLineIndex != previousLineIndex) && scrollLyrics) {
                     if (currentLineIndex != previousLineIndex) {
-                        // Calculate which line should be at the top to center the active group
-                        val centerTargetIndex = currentLineIndex
-                        performSmoothPageScroll(centerTargetIndex, 1500) // Auto scroll duration
+                        performSmoothPageScroll(currentLineIndex, 1500)
                     }
                 }
             }
@@ -834,6 +842,7 @@ fun OriginalLyrics(
                 )
             }
         } else {
+            val ambientMotionEnabled = rememberAmbientMotionEnabled()
             LazyColumn(
                 state = lazyListState,
                 contentPadding =
@@ -847,16 +856,29 @@ fun OriginalLyrics(
                         .nestedScroll(
                             remember {
                                 object : NestedScrollConnection {
+                                    private var userScrollActive = false
+
+                                    override fun onPreScroll(
+                                        available: Offset,
+                                        source: NestedScrollSource,
+                                    ): Offset {
+                                        if (source == NestedScrollSource.UserInput) {
+                                            userScrollActive = true
+                                        }
+                                        return Offset.Zero
+                                    }
+
                                     override fun onPostScroll(
                                         consumed: Offset,
                                         available: Offset,
                                         source: NestedScrollSource,
                                     ): Offset {
                                         if (source == NestedScrollSource.UserInput) {
+                                            userScrollActive = true
                                             isAutoScrollEnabled = false
-                                        }
-                                        if (!isSelectionModeActive) { // Only update preview time if not selecting
-                                            lastPreviewTime = System.currentTimeMillis()
+                                            if (!isSelectionModeActive) {
+                                                lastPreviewTime = System.currentTimeMillis()
+                                            }
                                         }
                                         return super.onPostScroll(consumed, available, source)
                                     }
@@ -865,9 +887,12 @@ fun OriginalLyrics(
                                         consumed: Velocity,
                                         available: Velocity,
                                     ): Velocity {
-                                        isAutoScrollEnabled = false
-                                        if (!isSelectionModeActive) { // Only update preview time if not selecting
-                                            lastPreviewTime = System.currentTimeMillis()
+                                        if (userScrollActive) {
+                                            userScrollActive = false
+                                            isAutoScrollEnabled = false
+                                            if (!isSelectionModeActive) {
+                                                lastPreviewTime = System.currentTimeMillis()
+                                            }
                                         }
                                         return super.onPostFling(consumed, available)
                                     }
@@ -885,8 +910,14 @@ fun OriginalLyrics(
                 // Show lyrics provider at the top, scrolling with content
                 if (isLyricsProviderShown) {
                     item {
+                        val providerAttribution =
+                            if (lyricsEntity?.provider.equals("Unison", ignoreCase = true)) {
+                                stringResource(R.string.lyrics_from_unison)
+                            } else {
+                                "Lyrics from ${lyricsEntity?.provider}"
+                            }
                         Text(
-                            text = "Lyrics from ${lyricsEntity?.provider}",
+                            text = providerAttribution,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                             fontWeight = FontWeight.Medium,
@@ -921,7 +952,6 @@ fun OriginalLyrics(
                     }
                 } else {
                     val lyricsOffset = currentSong?.song?.lyricsClockOffset?.toLong() ?: 0L
-                    val effectivePlaybackPosition = currentPlaybackPosition + lyricsOffset
 
                     itemsIndexed(
                         items = lines,
@@ -1110,12 +1140,11 @@ fun OriginalLyrics(
                         // pass each frame, which is what makes blurred text
                         // stutter. The distance only moves when the sung line
                         // advances, and the alpha tween below covers the change.
-                        val lineBlur = lyricsLineBlur(lineDistance)
+                        val lineBlur = if (ambientMotionEnabled) lyricsLineBlur(lineDistance) else 0.dp
 
                         Column(
                             modifier =
-                                itemModifier
-                                    .blur(lineBlur)
+                                (if (lineBlur > 0.05.dp) itemModifier.blur(lineBlur) else itemModifier)
                                     .graphicsLayer {
                                         this.alpha = if (item.isBackground) alpha * 0.8f else alpha
                                         this.scaleX = scale * bgScale
@@ -1152,6 +1181,12 @@ fun OriginalLyrics(
                             val subText = if (romanizeAsMain && isRomanizedAvailable) item.text else romanizedText
 
                             val hasWordTimings = if (romanizeAsMain && isRomanizedAvailable) false else item.words?.isNotEmpty() == true
+                            val effectivePlaybackPosition =
+                                if (hasWordTimings && isActiveLine) {
+                                    currentPlaybackPositionState.longValue + lyricsOffset
+                                } else {
+                                    0L
+                                }
 
                             // Word-by-word animation styles
                             if (hasWordTimings && lyricsAnimationStyle == LyricsAnimationStyle.NONE) {

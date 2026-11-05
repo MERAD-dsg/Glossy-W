@@ -72,7 +72,7 @@ internal fun AppleMusicLyricsView(
     activePillContainer: Color,
     activePillContent: Color,
     typography: AppleMusicTypography,
-    position: Long,
+    positionProvider: () -> Long,
     duration: Long,
     modifier: Modifier = Modifier,
 ) {
@@ -130,9 +130,12 @@ internal fun AppleMusicLyricsView(
     val scrollWakesControls = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: NestedScrollSource): androidx.compose.ui.geometry.Offset {
-                if (available.y < 0f) {
+                if (source != NestedScrollSource.UserInput) {
+                    return androidx.compose.ui.geometry.Offset.Zero
+                }
+                if (available.y < -4f) {
                     showCluster = false
-                } else if (available.y > 0f) {
+                } else if (available.y > 4f) {
                     showCluster = true
                     interactionTick++
                 }
@@ -242,7 +245,7 @@ internal fun AppleMusicLyricsView(
                 }
 
                 else -> {
-                    val positionProvider = remember { { playerConnection.player.currentPosition } }
+                    val sliderPositionProvider = remember { { null as Long? } }
                     ProvideTextStyle(
                         value = MaterialTheme.typography.bodyMedium.copy(
                             fontSize = 14.sp,
@@ -250,7 +253,7 @@ internal fun AppleMusicLyricsView(
                         )
                     ) {
                         Lyrics(
-                            sliderPositionProvider = positionProvider,
+                            sliderPositionProvider = sliderPositionProvider,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(horizontal = 24.dp)
@@ -274,7 +277,7 @@ internal fun AppleMusicLyricsView(
                 lyricsAvailable = true,
                 activeColor = activePillContainer,
                 activeContentColor = activePillContent,
-                position = position,
+                positionProvider = positionProvider,
                 duration = duration
             )
         }

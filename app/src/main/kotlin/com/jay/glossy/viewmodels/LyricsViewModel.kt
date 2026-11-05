@@ -30,6 +30,9 @@ class LyricsViewModel @Inject constructor() : ViewModel() {
 
     private var processJob: kotlinx.coroutines.Job? = null
 
+    private val _lyricsSongId = MutableStateFlow<String?>(null)
+    val lyricsSongId: StateFlow<String?> = _lyricsSongId.asStateFlow()
+
     private val _lines = MutableStateFlow<List<LyricsEntry>>(emptyList())
     val lines: StateFlow<List<LyricsEntry>> = _lines.asStateFlow()
 
@@ -37,45 +40,42 @@ class LyricsViewModel @Inject constructor() : ViewModel() {
     val mergedLyricsList: StateFlow<List<LyricsListItem>> = _mergedLyricsList.asStateFlow()
 
     fun processLyrics(
+        songId: String?,
         lyrics: String?,
         enabledLanguages: List<String>,
         romanizeCyrillicByLine: Boolean,
         showIntervalIndicator: Boolean
     ) {
         processJob?.cancel()
+        if (songId != _lyricsSongId.value || lyrics == null || lyrics == LYRICS_NOT_FOUND) {
+            _lyricsSongId.value = songId
+            _lines.value = emptyList()
+            _mergedLyricsList.value = emptyList()
+        }
+        if (lyrics == null || lyrics == LYRICS_NOT_FOUND) {
+            return
+        }
         processJob = viewModelScope.launch {
             val processedLines = withContext(Dispatchers.Default) {
-                if (lyrics == null || lyrics == LYRICS_NOT_FOUND) {
-                    emptyList()
+                val parsedLines = LyricsUtils.parseLyrics(lyrics)
+
+                if (parsedLines.isNotEmpty()) {
+                    listOf(LyricsEntry.HEAD_LYRICS_ENTRY) + parsedLines
                 } else {
-                    // The parser decides, not a regex hint. Word-timed payloads
-                    // (the rich formats Spotify delivers) carry no
-                    // [mm:ss line stamps at all, so the hint sent them to the
-                    // plain-text fallback: the song rendered with raw <mm:ss.xx>
-                    // tags and nothing that followed the music, while every other
-                    // lyrics surface parsed the same text fine.
-                    val parsedLines = LyricsUtils.parseLyrics(lyrics)
-                    
-                    if (parsedLines.isNotEmpty()) {
-                        listOf(LyricsEntry.HEAD_LYRICS_ENTRY) + parsedLines
-                    } else {
-                        // Genuinely unsynced text: shown as plain lines, never
-                        // followed. The stamp-filter keeps metadata lines like
-                        // [offset:…] or [by:…] out of the rendered text.
-                        lyrics.lines()
-                            .filter { it.isNotBlank() && !timestampRegex.containsMatchIn(it) }
-                            .mapIndexed { index, line ->
-                                LyricsEntry(index * 1000L, line)
-                            }
-                    }
+                    lyrics.lines()
+                        .filter { it.isNotBlank() && !timestampRegex.containsMatchIn(it) }
+                        .mapIndexed { index, line ->
+                            LyricsEntry(index * 1000L, line)
+                        }
                 }
             }
-            
+
+            _lyricsSongId.value = songId
             _lines.value = processedLines
             updateMergedList(processedLines, showIntervalIndicator)
 
             // Romanize in the background after the UI has been updated
-            if (lyrics != null && lyrics != LYRICS_NOT_FOUND && enabledLanguages.isNotEmpty()) {
+            if (enabledLanguages.isNotEmpty()) {
                 launch(Dispatchers.Default) {
                     processedLines.forEach { entry ->
                         if (entry == LyricsEntry.HEAD_LYRICS_ENTRY) return@forEach

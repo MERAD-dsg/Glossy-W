@@ -194,7 +194,8 @@ internal fun LyricsLine(
     // re-allocates the RenderEffect pass on each one, which is exactly what
     // makes blurred text stutter. The distance only changes when the sung line
     // advances, and the alpha tween below still carries the transition.
-    val lineBlur = lyricsLineBlur(lineDistance)
+    val ambientMotionEnabled = rememberAmbientMotionEnabled()
+    val lineBlur = if (ambientMotionEnabled) lyricsLineBlur(lineDistance) else 0.dp
 
     // The inset is applied inside the blur, not before it: blur draws into a
     // layer and clips to its bounds, so padding applied earlier shrinks those
@@ -208,7 +209,9 @@ internal fun LyricsLine(
             bottom = if (item.isBackground) 2.dp else 12.dp
         )
 
-    Box(modifier = itemModifier.blur(lineBlur).then(lineInset), contentAlignment = when {
+    Box(
+        modifier = (if (lineBlur > 0.05.dp) itemModifier.blur(lineBlur) else itemModifier).then(lineInset),
+        contentAlignment = when {
         respectAgentPositioning && item.agent == "v1" -> Alignment.CenterStart
         respectAgentPositioning && item.agent == "v2" -> Alignment.CenterEnd
         item.isBackground -> Alignment.Center
