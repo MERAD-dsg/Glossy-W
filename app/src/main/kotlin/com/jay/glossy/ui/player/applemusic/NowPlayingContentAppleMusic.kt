@@ -298,7 +298,7 @@ private fun AppleMusicBottomBlur(
 @Composable
 fun NowPlayingContentAppleMusic(
     bottomSheetState: BottomSheetState,
-    position: Long,
+    positionProvider: () -> Long,
     duration: Long,
     modifier: Modifier = Modifier
 ) {
@@ -355,14 +355,10 @@ fun NowPlayingContentAppleMusic(
 
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         Box(modifier = Modifier.matchParentSize()) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(highResThumbnailUrl)
-                    .crossfade(500)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().blur(180.dp)
+            BlurredArtworkBackdrop(
+                url = mediaMetadata?.thumbnailUrl,
+                blurStrength = 0.85f,
+                modifier = Modifier.fillMaxSize(),
             )
             Box(modifier = Modifier.fillMaxSize().alpha(0.72f).background(backdropBrush))
         }
@@ -376,7 +372,7 @@ fun NowPlayingContentAppleMusic(
                     activePillContent = activePillContent,
                     typography = typography,
                     bottomSheetState = bottomSheetState,
-                    position = position,
+                    positionProvider = positionProvider,
                     duration = duration
                 )
                 AppleMusicView.LYRICS -> AppleMusicLyricsView(
@@ -385,7 +381,7 @@ fun NowPlayingContentAppleMusic(
                     activePillContainer = activePillContainer,
                     activePillContent = activePillContent,
                     typography = typography,
-                    position = position,
+                    positionProvider = positionProvider,
                     duration = duration
                 )
                 AppleMusicView.QUEUE -> AppleMusicQueueView(
@@ -395,7 +391,7 @@ fun NowPlayingContentAppleMusic(
                     activePillContent = activePillContent,
                     typography = typography,
                     bottomSheetState = bottomSheetState,
-                    position = position,
+                    positionProvider = positionProvider,
                     duration = duration
                 )
             }
@@ -431,7 +427,7 @@ private fun AppleMusicMainView(
     activePillContent: Color,
     typography: AppleMusicTypography,
     bottomSheetState: BottomSheetState,
-    position: Long,
+    positionProvider: () -> Long,
     duration: Long
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
@@ -497,7 +493,7 @@ private fun AppleMusicMainView(
                 // so a swipe never leaves a stale line on a neighbouring cover.
                 showGlowLyrics =
                     showLyricsOnPlayer && miniLyricsStyle == MiniLyricsStyle.CANVAS_GLOW,
-                positionProvider = { position },
+                positionProvider = positionProvider,
                 onExpandLyrics = { onSelectView(AppleMusicView.LYRICS) },
                 onCanvasReady = { /* Managed internally */ }
             )
@@ -545,7 +541,7 @@ private fun AppleMusicMainView(
                 if (showLyricsOnPlayer && miniLyricsStyle == MiniLyricsStyle.CLASSIC) {
                     PlayerSyncedLyricsView(
                         mediaMetadata = mediaMetadata,
-                        positionProvider = { position },
+                        positionProvider = positionProvider,
                         onExpand = { onSelectView(AppleMusicView.LYRICS) },
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -557,7 +553,7 @@ private fun AppleMusicMainView(
                     lyricsAvailable = true, 
                     activeColor = activePillContainer,
                     activeContentColor = activePillContent,
-                    position = position,
+                    positionProvider = positionProvider,
                     duration = duration
                 )
             }

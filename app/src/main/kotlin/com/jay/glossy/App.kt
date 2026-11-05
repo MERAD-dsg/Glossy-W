@@ -137,6 +137,7 @@ class App :
         // disk during every cold start on Android 12 and below. The settings
         // read above is already happening, so sharing its answer is free.
         cachedAppLanguageTag = settings[AppLanguageKey]
+        cachedHasSeenWelcome = settings[androidx.datastore.preferences.core.booleanPreferencesKey("has_seen_welcome")] == true
 
         ArtistConjunctions.conjunctions = listOf(
             R.string.and,
@@ -315,11 +316,14 @@ class App :
             .apply {
                 crossfade(true)
                 allowHardware(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-                // Memory cache for fast image loading (prevents network requests on recomposition)
+                // Memory cache sized conservatively on low-RAM / older devices to
+                // avoid heap pressure and GC pauses during scrolling.
                 memoryCache {
+                    val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+                    val memFraction = if (am?.isLowRamDevice == true) 0.10 else 0.15
                     MemoryCache
                         .Builder()
-                        .maxSizePercent(context, 0.15)
+                        .maxSizePercent(context, memFraction)
                         .build()
                 }
                 if (cacheSize == 0) {
@@ -352,6 +356,10 @@ class App :
          */
         @Volatile
         var cachedAppLanguageTag: String? = null
+            private set
+
+        @Volatile
+        var cachedHasSeenWelcome: Boolean? = null
             private set
 
         suspend fun forgetAccount(context: Context) {

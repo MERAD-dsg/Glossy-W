@@ -160,6 +160,7 @@ import com.jay.glossy.constants.DisableScreenshotKey
 import com.jay.glossy.constants.DynamicThemeKey
 import com.jay.glossy.constants.EnableHighRefreshRateKey
 import com.jay.glossy.constants.EnableLandscapeScalingKey
+import com.jay.glossy.constants.EnableUnisonKey
 import com.jay.glossy.constants.ExperimentalLyricsKey
 import com.jay.glossy.constants.LastSeenVersionKey
 import com.jay.glossy.constants.ListenTogetherInTopBarKey
@@ -179,6 +180,7 @@ import com.jay.glossy.constants.SimpMusicMigrationDoneKey
 import com.jay.glossy.constants.SlimNavBarHeight
 import com.jay.glossy.constants.SlimNavBarKey
 import com.jay.glossy.constants.StopMusicOnTaskClearKey
+import com.jay.glossy.constants.UnisonPriorityMigrationDoneKey
 import com.jay.glossy.constants.UpdateNotificationsEnabledKey
 import com.jay.glossy.constants.UseFloatingNavBarKey
 import com.jay.glossy.constants.UseNewMiniPlayerDesignKey
@@ -446,9 +448,27 @@ class MainActivity : ComponentActivity() {
                             if (orderList.isEmpty()) "" else orderList.joinToString(",")
                     }
                     if (settings[PreferredLyricsProviderKey]?.equals("SIMPMUSIC", ignoreCase = true) == true) {
-                        settings[PreferredLyricsProviderKey] = PreferredLyricsProvider.LRCLIB.name
+                        settings[PreferredLyricsProviderKey] = PreferredLyricsProvider.UNISON.name
                     }
                     settings[SimpMusicMigrationDoneKey] = true
+                }
+                if (preferences[UnisonPriorityMigrationDoneKey] != true) {
+                    if (settings[EnableUnisonKey] == null) {
+                        settings[EnableUnisonKey] = true
+                    }
+                    val currentOrder = settings[LyricsProviderOrderKey] ?: ""
+                    if (currentOrder.isNotBlank()) {
+                        val others =
+                            currentOrder
+                                .split(';', ',')
+                                .map { it.trim() }
+                                .filter { it.isNotBlank() && !it.equals("Unison", ignoreCase = true) }
+                        settings[LyricsProviderOrderKey] = (listOf("Unison") + others).joinToString(",")
+                    }
+                    if (settings[PreferredLyricsProviderKey] == null) {
+                        settings[PreferredLyricsProviderKey] = PreferredLyricsProvider.UNISON.name
+                    }
+                    settings[UnisonPriorityMigrationDoneKey] = true
                 }
                 settings[LastSeenVersionKey] = currentVersion
             }
@@ -629,6 +649,7 @@ class MainActivity : ComponentActivity() {
                                         ImageRequest
                                             .Builder(this@MainActivity)
                                             .data(thumbUrl)
+                                            .size(128, 128)
                                             .allowHardware(false)
                                             .memoryCachePolicy(CachePolicy.ENABLED)
                                             .diskCachePolicy(CachePolicy.ENABLED)
@@ -730,7 +751,8 @@ class MainActivity : ComponentActivity() {
 
                 val context = LocalContext.current
                 val hasSeenWelcome = remember {
-                    context.dataStore.get(booleanPreferencesKey("has_seen_welcome"), false)
+                    App.cachedHasSeenWelcome
+                        ?: context.dataStore.get(booleanPreferencesKey("has_seen_welcome"), false)
                 }
 
                 LaunchedEffect(Unit) {
@@ -932,13 +954,6 @@ class MainActivity : ComponentActivity() {
                             .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)
                             .add(WindowInsets(top = AppBarHeight, bottom = bottom))
                     }
-                appBarScrollBehavior(
-                    canScroll = {
-                        !inSearchScreen &&
-                            (playerBottomSheetState.isCollapsed || playerBottomSheetState.isDismissed)
-                    },
-                )
-
                 val topAppBarScrollBehavior =
                     appBarScrollBehavior(
                         canScroll = {
@@ -1151,6 +1166,7 @@ class MainActivity : ComponentActivity() {
                                                     modifier = Modifier.size(52.dp),
                                                     tint = MaterialTheme.colorScheme.onSurface
                                                 )
+                                                val brandFontFamily = remember { FontFamily(Font(R.font.roundex)) }
                                                 Text(
                                                     text = "Glossy",
                                                     // Sized past headlineMedium on purpose: the
@@ -1158,7 +1174,7 @@ class MainActivity : ComponentActivity() {
                                                     // the bar rather than sitting level with the
                                                     // actions beside it.
                                                     style = MaterialTheme.typography.headlineMedium.copy(
-                                                        fontFamily = FontFamily(Font(R.font.roundex)),
+                                                        fontFamily = brandFontFamily,
                                                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                                                         fontSize = 34.sp,
                                                         lineHeight = 40.sp

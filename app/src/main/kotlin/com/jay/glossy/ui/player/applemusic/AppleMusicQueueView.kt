@@ -51,7 +51,7 @@ internal fun AppleMusicQueueView(
     activePillContent: Color,
     typography: AppleMusicTypography,
     bottomSheetState: BottomSheetState,
-    position: Long,
+    positionProvider: () -> Long,
     duration: Long,
     modifier: Modifier = Modifier
 ) {
@@ -227,7 +227,7 @@ internal fun AppleMusicQueueView(
             lyricsAvailable = true,
             activeColor = activePillContainer,
             activeContentColor = activePillContent,
-            position = position,
+            positionProvider = positionProvider,
             duration = duration
         )
     }

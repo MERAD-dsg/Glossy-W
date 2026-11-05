@@ -443,13 +443,44 @@ internal fun AppleMusicDock(
 }
 
 @Composable
+private fun AppleMusicProgressSection(
+    positionProvider: () -> Long,
+    duration: Long,
+) {
+    val playerConnection = LocalPlayerConnection.current
+    var sliderPosition by remember { mutableStateOf<Long?>(null) }
+
+    val displayPosition = sliderPosition ?: positionProvider()
+    val safeDuration = if (duration > 0) duration else 1L
+    val sliderValue = (displayPosition.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
+
+    Box(modifier = Modifier.fillMaxWidth().height(18.dp), contentAlignment = Alignment.Center) {
+        AppleMusicThinSlider(
+            value = sliderValue,
+            activeColor = AppleMusicTrackActive,
+            onValueChange = { sliderPosition = (it * safeDuration).toLong() },
+            onValueChangeFinished = {
+                sliderPosition?.let { playerConnection?.player?.seekTo(it) }
+                sliderPosition = null
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(text = makeTimeString(displayPosition), color = Color.White, style = MaterialTheme.typography.labelMedium)
+        Text(text = "-" + makeTimeString((safeDuration - displayPosition).coerceAtLeast(0L)), color = Color.White, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
 internal fun AppleMusicBottomCluster(
     viewState: AppleMusicView,
     onSelectView: (AppleMusicView) -> Unit,
     lyricsAvailable: Boolean,
     activeColor: Color,
     activeContentColor: Color,
-    position: Long,
+    positionProvider: () -> Long,
     duration: Long,
     modifier: Modifier = Modifier,
     withFrost: Boolean = true,
@@ -457,37 +488,16 @@ internal fun AppleMusicBottomCluster(
     val localDensity = LocalDensity.current
     val clusterContent: @Composable () -> Unit = {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 8.dp)) {
-        
-        val playerConnection = LocalPlayerConnection.current
-        var sliderPosition by remember { mutableStateOf<Long?>(null) }
-        
-        val displayPosition = sliderPosition ?: position
-        val safeDuration = if (duration > 0) duration else 1L
-        val sliderValue = (displayPosition.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
-
-        Box(modifier = Modifier.fillMaxWidth().height(18.dp), contentAlignment = Alignment.Center) {
-            AppleMusicThinSlider(
-                value = sliderValue,
-                activeColor = AppleMusicTrackActive,
-                onValueChange = { sliderPosition = (it * safeDuration).toLong() },
-                onValueChangeFinished = {
-                    sliderPosition?.let { playerConnection?.player?.seekTo(it) }
-                    sliderPosition = null
-                },
-                modifier = Modifier.fillMaxWidth(),
+            AppleMusicProgressSection(
+                positionProvider = positionProvider,
+                duration = duration,
             )
-        }
-        
-        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = makeTimeString(displayPosition), color = Color.White, style = MaterialTheme.typography.labelMedium)
-            Text(text = "-" + makeTimeString(safeDuration - displayPosition), color = Color.White, style = MaterialTheme.typography.labelMedium)
-        }
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        AppleMusicTransportRow()
-        Spacer(modifier = Modifier.height(14.dp))
-        AppleMusicVolumeRow()
-        Spacer(modifier = Modifier.height(14.dp))
+
+            Spacer(modifier = Modifier.height(12.dp))
+            AppleMusicTransportRow()
+            Spacer(modifier = Modifier.height(14.dp))
+            AppleMusicVolumeRow()
+            Spacer(modifier = Modifier.height(14.dp))
         
             AppleMusicDock(
                 viewState = viewState,
