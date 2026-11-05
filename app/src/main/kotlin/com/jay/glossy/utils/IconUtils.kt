@@ -22,7 +22,7 @@ enum class AppIcon(
     /** Mipmap the settings dialog draws in its row. */
     val previewRes: Int,
 ) {
-    CLASSIC("com.jay.glossy.MainActivityAlias", "Glossy", R.mipmap.ic_launcher),
+    CLASSIC("com.jay.glossy.MainActivityAlias", "Glossy-W", R.mipmap.ic_launcher),
     EMBER("com.jay.glossy.MainActivityEmber", "Ember", R.mipmap.ic_launcher_ember),
     LAVENDER("com.jay.glossy.MainActivityLavender", "Lavender", R.mipmap.ic_launcher_lavender),
     AURORA("com.jay.glossy.MainActivityAurora", "Aurora", R.mipmap.ic_launcher_aurora),

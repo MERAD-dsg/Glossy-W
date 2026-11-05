@@ -8,7 +8,7 @@
         <intent
             android:action="com.jay.glossy.action.SEARCH"
             android:targetClass="com.jay.glossy.MainActivity"
-            android:targetPackage="com.jay.glossy" />
+            android:targetPackage="com.merad.glossyw" />
     </shortcut>
     <shortcut
         android:enabled="true"
@@ -18,6 +18,6 @@
         <intent
             android:action="com.jay.glossy.action.LIBRARY"
             android:targetClass="com.jay.glossy.MainActivity"
-            android:targetPackage="com.jay.glossy" />
+            android:targetPackage="com.merad.glossyw" />
     </shortcut>
 </shortcuts>

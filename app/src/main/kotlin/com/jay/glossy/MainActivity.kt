@@ -1168,7 +1168,7 @@ class MainActivity : ComponentActivity() {
                                                 )
                                                 val brandFontFamily = remember { FontFamily(Font(R.font.roundex)) }
                                                 Text(
-                                                    text = "Glossy",
+                                                    text = "Glossy-W",
                                                     // Sized past headlineMedium on purpose: the
                                                     // wordmark is the app's signature, so it leads
                                                     // the bar rather than sitting level with the
@@ -1176,8 +1176,8 @@ class MainActivity : ComponentActivity() {
                                                     style = MaterialTheme.typography.headlineMedium.copy(
                                                         fontFamily = brandFontFamily,
                                                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                                        fontSize = 34.sp,
-                                                        lineHeight = 40.sp
+                                                        fontSize = 30.sp,
+                                                        lineHeight = 36.sp
                                                     ),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis,
